@@ -55,7 +55,8 @@ enum
 enum
 {
 	AnimationType_None = 0,
-	AnimationType_BrightnessWave = 1
+	AnimationType_BrightnessPulse = 1,
+	AnimationType_BrightnessWave = 2
 };
 
 void writeProtocolIdentity(uint8_t* array)
@@ -186,21 +187,23 @@ int main(int argc, char *argv[])
 			break;
 		}
 
-		sleep(4);
+		sleep(5);
 
 		writeProtocolIdentity(&send_data[0]);
 		send_data[MsgPos_Length] = MessageLength_Set;
 		uint16ToUint8Array(currentMessageNumber, &send_data[MsgPos_Number]);
 		send_data[MsgPos_Type] = MessageType_Set;
-		send_data[MsgPos_Animation] = AnimationType_None;
-		send_data[MsgPos_AnimationSpeed] = 0;
+		send_data[MsgPos_Animation] = (uint8_t)(rand() % 2);
+		send_data[MsgPos_AnimationSpeed] = 5;
 		send_data[MsgPos_Hue] = (uint8_t)(rand() % 256);
-		send_data[MsgPos_Brightness] = (uint8_t)(rand() % 64);
+		send_data[MsgPos_Brightness] = (uint8_t)(rand() % 256);
 
 		currentMessageNumber += 1;
 
-		printf("Sending message %d, hue %d, brightness %d\n",
-			   (int)send_data[0], (int)send_data[1], (int)send_data[2]);
+		printf("Sending MessageType_Set, animation %d, hue %d, brightness %d\n",
+			(int)send_data[MsgPos_Animation],
+			(int)send_data[MsgPos_Hue],
+			(int)send_data[MsgPos_Brightness]);
 
 		writeBytes = write(newsockfd, &send_data, MessageLength_Set);
 		if (writeBytes < 0)

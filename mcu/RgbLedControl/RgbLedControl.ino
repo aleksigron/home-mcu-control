@@ -3,6 +3,8 @@
 
 #include "WifiCredentials.h"
 
+#define M_TAU 6.28318530718
+
 #define NUM_LEDS 8
 #define DATA_PIN 4
 #define SEND_BUFFER_SIZE 128
@@ -57,7 +59,8 @@ enum MessageLength : uint8_t
 enum AnimationType : uint8_t
 {
 	AnimationType_None = 0,
-	AnimationType_BrightnessWave = 1
+	AnimationType_BrightnessPulse = 1,
+	AnimationType_BrightnessWave = 2
 };
 
 void writeProtocolIdentity(uint8_t* array)
@@ -126,7 +129,8 @@ void setup()
 void loop()
 {
 	static uint16_t currentMessageNumber = 0;
-	static uint8_t currentHue = 0;
+	static uint8_t currentAnimStep = 0;
+	static uint8_t setAnimation = 0, setAnimSpeed = 0, setHue = 0, setBrightness = 0;
 
 	static bool sendAcknowledge = false;
 	static uint16_t sendAcknowledgeNumber = 0;
@@ -151,14 +155,35 @@ void loop()
 	while (client.available() || client.connected())
 	{
 		// Update LEDs
-		for (uint8_t i = 0; i < NUM_LEDS; ++i)
+		if (setAnimation == AnimationType_None)
 		{
-			leds[i].setHue(currentHue);
+			FastLED.setBrightness(setBrightness);
+
+			for (uint8_t i = 0; i < NUM_LEDS; ++i)
+			{
+				leds[i].setHue(setHue);
+			}
+		}
+		else if (setAnimation == AnimationType_BrightnessPulse)
+		{
+			currentAnimStep += setAnimSpeed;
+
+			double factor = cos(currentAnimStep / 256.0 * M_TAU) * 0.5 + 0.5;
+			FastLED.setBrightness((uint8_t)(setBrightness * factor));
+			
+			for (uint8_t i = 0; i < NUM_LEDS; ++i)
+			{
+				leds[i].setHue(setHue);
+			}
+		}
+		else if (setAnimation == AnimationType_BrightnessWave)
+		{
+			currentAnimStep += setAnimSpeed;
 		}
 
 		FastLED.show();
 
-		delay(100);
+		delay(50);
 		
 		// Update network
 
@@ -217,16 +242,15 @@ void loop()
 
 					if (messageType == MessageType_Set)
 					{
-						uint8_t animation = readBuffer[messageStart + MsgPos_Animation];
-						uint8_t speed = readBuffer[messageStart + MsgPos_AnimationSpeed];
-						uint8_t hue = readBuffer[messageStart + MsgPos_Hue];
-						uint8_t brightness = readBuffer[messageStart + MsgPos_Brightness];
+						setAnimation = readBuffer[messageStart + MsgPos_Animation];
+						setAnimSpeed = readBuffer[messageStart + MsgPos_AnimationSpeed];
+						setHue = readBuffer[messageStart + MsgPos_Hue];
+						setBrightness = readBuffer[messageStart + MsgPos_Brightness];
 						
 						Serial.printf("Received animation %d, speed %d, hue %d, brightness %d\n",
-							(int)animation, (int)speed, (int)hue, (int)brightness);
+							(int)setAnimation, (int)setAnimSpeed, (int)setHue, (int)setBrightness);
 
-						currentHue = hue;
-						FastLED.setBrightness(brightness);
+						currentAnimStep = 0;
 
 						sendAcknowledge = true;
 						sendAcknowledgeNumber = messageNumber;
