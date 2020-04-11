@@ -13,6 +13,72 @@
 
 #define BUFFER_SIZE 256
 
+const uint16_t port = 3123;
+const uint8_t ProtocolIdentityLength = 4;
+const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
+
+enum
+{
+	MsgPos_Protocol = 0,
+	MsgPos_Length = 4,
+	MsgPos_Number = 5,
+	MsgPos_Type = 7,
+
+	// For MessageType_Set
+	MsgPos_Animation = 8,
+	MsgPos_AnimationSpeed = 9,
+	MsgPos_Hue = 10,
+	MsgPos_Brightness = 11,
+
+	// For MessageType_Connected
+	MsgPos_DeviceName = 8,
+
+	// For MessageType_Acknowledge
+	MsgPos_ResponseTo = 8
+};
+
+enum
+{
+	MessageType_None = 0,
+	MessageType_Acknowledge = 1,
+	MessageType_Connected = 2,
+	MessageType_Set = 3
+};
+
+enum
+{
+	MessageLength_Connected = 9,
+	MessageLength_Acknowledge = 10,
+	MessageLength_Set = 12
+};
+
+enum
+{
+	AnimationType_None = 0,
+	AnimationType_BrightnessWave = 1
+};
+
+void writeProtocolIdentity(uint8_t* array)
+{
+	for (int i = 0; i < ProtocolIdentityLength; ++i)
+	{
+		array[i] = ProtocolIdentity[i];
+	}
+}
+
+void uint16ToUint8Array(uint16_t val, uint8_t* arr)
+{
+	arr[0] = (uint8_t)(val & 0x00ff);
+	arr[1] = (uint8_t)((val & 0xff00) >> 8);
+}
+
+uint16_t uint8ArrayToUint16(const uint8_t* arr)
+{
+	uint16_t result = arr[0];
+	result |= arr[1] << 8;
+	return result;
+}
+
 void error(const char *msg)
 {
     perror(msg);
@@ -23,11 +89,11 @@ int main(int argc, char *argv[])
 {
 	int sockfd, newsockfd, portno;
 	socklen_t clilen;
-	char buffer[BUFFER_SIZE];
+	unsigned char buffer[BUFFER_SIZE];
 	struct sockaddr_in serv_addr, cli_addr;
-	ssize_t n;
-	unsigned char send_data[4];
-	unsigned int sleep_seconds;
+	ssize_t readBytes, writeBytes;
+	unsigned char send_data[32];
+	unsigned short currentMessageNumber = 0;
 
 	if (argc < 2) {
 		fprintf(stderr,"ERROR, no port provided\n");
@@ -55,34 +121,93 @@ int main(int argc, char *argv[])
 
 	while (1)
 	{
-		send_data[0] = 2;
-		send_data[1] = (uint8_t)(rand() % 256);
-		send_data[2] = (uint8_t)(rand() % 64);
-		send_data[3] = 0;
+		bzero(buffer, BUFFER_SIZE);
+		readBytes = read(newsockfd, buffer, BUFFER_SIZE - 1);
 
-		printf("Sending message %d, hue %d, brightness %d\n",
-			   (int)send_data[0], (int)send_data[1], (int)send_data[2]);
+		printf("Read bytes: %d\n", (int)readBytes);
 
-		n = write(newsockfd, &send_data, 4);
-		if (n < 0)
+		int bufferByteIndex = 0;
+
+		while (bufferByteIndex < readBytes)
 		{
-			error("ERROR writing to socket");
-			break;
+			int identityBytesFound = 0;
+			int messageStart = 0;
+
+			// Find start of proper message
+			while (identityBytesFound < ProtocolIdentityLength && bufferByteIndex < readBytes)
+			{
+				if (buffer[bufferByteIndex] == ProtocolIdentity[identityBytesFound])
+				{
+					identityBytesFound += 1;
+				}
+				else
+				{
+					identityBytesFound = 0;
+					messageStart = bufferByteIndex + 1;
+				}
+
+				bufferByteIndex += 1;
+			}
+
+			// We found message start
+			if (identityBytesFound == ProtocolIdentityLength)
+			{
+				printf("We found message start\n");
+
+				uint8_t messageLength = buffer[messageStart + MsgPos_Length];
+				uint8_t messageType = buffer[messageStart + MsgPos_Type];
+
+				uint16_t messageNumber = uint8ArrayToUint16(&buffer[messageStart + MsgPos_Number]);
+
+				// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
+
+
+				if (messageType == MessageType_Acknowledge)
+				{
+					uint16_t responseTo = uint8ArrayToUint16(&buffer[messageStart + MsgPos_ResponseTo]);
+
+					printf("Received acknowledge to message number %d\n", (int)responseTo);
+				}
+
+				if (messageType == MessageType_Connected)
+				{
+					uint16_t deviceName = uint8ArrayToUint16(&buffer[messageStart + MsgPos_DeviceName]);
+
+					printf("Received connected message from device %d\n", (int)deviceName);
+				}
+
+				bufferByteIndex = messageStart + messageLength;
+			}
 		}
 
-		bzero(buffer, BUFFER_SIZE);
-		n = read(newsockfd, buffer, BUFFER_SIZE - 1);
-
-		if (n < 0)
+		if (readBytes < 0)
 		{
 			error("ERROR reading from socket");
 			break;
 		}
 
-		printf("Received message %d\n", (int)buffer[0]);
+		sleep(4);
 
-		sleep_seconds = 3 + (rand() % 8);
-		sleep(sleep_seconds);
+		writeProtocolIdentity(&send_data[0]);
+		send_data[MsgPos_Length] = MessageLength_Set;
+		uint16ToUint8Array(currentMessageNumber, &send_data[MsgPos_Number]);
+		send_data[MsgPos_Type] = MessageType_Set;
+		send_data[MsgPos_Animation] = AnimationType_None;
+		send_data[MsgPos_AnimationSpeed] = 0;
+		send_data[MsgPos_Hue] = (uint8_t)(rand() % 256);
+		send_data[MsgPos_Brightness] = (uint8_t)(rand() % 64);
+
+		currentMessageNumber += 1;
+
+		printf("Sending message %d, hue %d, brightness %d\n",
+			   (int)send_data[0], (int)send_data[1], (int)send_data[2]);
+
+		writeBytes = write(newsockfd, &send_data, MessageLength_Set);
+		if (writeBytes < 0)
+		{
+			error("ERROR writing to socket");
+			break;
+		}
 	}
 
 	close(newsockfd);

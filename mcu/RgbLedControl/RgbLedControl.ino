@@ -11,23 +11,75 @@
 const char* host = "192.168.1.47";
 const uint16_t port = 3123;
 
+const uint8_t MessageHeaderLength = 8;
+const uint8_t ProtocolIdentityLength = 4;
+const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
+
 CRGB leds[NUM_LEDS];
 uint8_t sendBuffer[SEND_BUFFER_SIZE];
 uint8_t readBuffer[READ_BUFFER_SIZE];
 
-enum MessageByte
+enum MsgPos
 {
-	MessageByte_Type = 0,
-	MessageByte_Hue = 1,
-	MessageByte_Brightness = 2
+	MsgPos_Protocol = 0,
+	MsgPos_Length = 4,
+	MsgPos_Number = 5,
+	MsgPos_Type = 7,
+
+	// For MessageType_Set
+	MsgPos_Animation = 8,
+	MsgPos_AnimationSpeed = 9,
+	MsgPos_Hue = 10,
+	MsgPos_Brightness = 11,
+
+	// For MessageType_Connected
+	MsgPos_DeviceName = 8,
+
+	// For MessageType_Acknowledge
+	MsgPos_ResponseTo = 8
 };
 
 enum MessageType : uint8_t
 {
 	MessageType_None = 0,
 	MessageType_Acknowledge = 1,
-	MessageType_Set = 2
+	MessageType_Connected = 2,
+	MessageType_Set = 3
 };
+
+enum MessageLength : uint8_t
+{
+	MessageLength_Connected = 10,
+	MessageLength_Acknowledge = 10,
+	MessageLength_Set = 12
+};
+
+enum AnimationType : uint8_t
+{
+	AnimationType_None = 0,
+	AnimationType_BrightnessWave = 1
+};
+
+void writeProtocolIdentity(uint8_t* array)
+{
+	for (int i = 0; i < ProtocolIdentityLength; ++i)
+	{
+		array[i] = ProtocolIdentity[i];
+	}
+}
+
+void uint16ToUint8Array(uint16_t val, uint8_t* arr)
+{
+	arr[0] = (uint8_t)(val & 0x00ff);
+	arr[1] = (uint8_t)((val & 0xff00) >> 8);
+}
+
+uint16_t uint8ArrayToUint16(const uint8_t* arr)
+{
+	uint16_t result = arr[0];
+	result |= arr[1] << 8;
+	return result;
+}
 
 void setup()
 {
@@ -38,7 +90,7 @@ void setup()
 	Serial.begin(115200);
 
 	Serial.println();
-	Serial.printf("Connecting to %s ", wifi_ssid);
+	Serial.printf("Connecting to WLAN \"%s\" ", wifi_ssid);
 
 	WiFi.mode(WIFI_STA);
 
@@ -73,15 +125,22 @@ void setup()
 
 void loop()
 {
+	static uint16_t currentMessageNumber = 0;
 	static uint8_t currentHue = 0;
+
 	static bool sendAcknowledge = false;
+	static uint16_t sendAcknowledgeNumber = 0;
+
+	static bool sendConnected = false;
+
 	static WiFiClient client;
 
-	Serial.printf("[Connecting to %s ... ", host);
+	Serial.printf("[Connecting to server %s:%d ... ", host, (int)port);
 
 	if (client.connect(host, port))
 	{
 		Serial.println("connected]");
+		sendConnected = true;
 	}
 	else
 	{
@@ -94,10 +153,8 @@ void loop()
 		// Update LEDs
 		for (uint8_t i = 0; i < NUM_LEDS; ++i)
 		{
-			leds[i].setHue((currentHue/* + i * 6*/));
+			leds[i].setHue(currentHue);
 		}
-
-		//currentHue += 1;
 
 		FastLED.show();
 
@@ -105,43 +162,117 @@ void loop()
 		
 		// Update network
 
-		if (client.available())
+		if (client.available() > 0)
 		{
 			int bytesAvailable = client.available();
-			
-			if (bytesAvailable >= 4)
+			int readBytes = (bytesAvailable <= READ_BUFFER_SIZE) ? bytesAvailable : READ_BUFFER_SIZE;
+
+			client.read(readBuffer, readBytes);
+
+			Serial.printf("Read bytes: %d\n", readBytes);
+
+			int bufferByteIndex = 0;
+
+			while (bufferByteIndex < readBytes)
 			{
-				client.read(readBuffer, 4);
-				
-				if (readBuffer[MessageByte_Type] == MessageType_Set)
+				int identityBytesFound = 0;
+				int messageStart = 0;
+
+				// Find start of proper message
+				while (identityBytesFound < ProtocolIdentityLength && bufferByteIndex < readBytes)
 				{
-					uint8_t hue = readBuffer[MessageByte_Hue];
-					uint8_t brightness = readBuffer[MessageByte_Brightness];
-					
-					Serial.printf("Received hue %d, brightness %d\n", (int)hue, (int)brightness);
+					if (readBuffer[bufferByteIndex] == ProtocolIdentity[identityBytesFound])
+					{
+						identityBytesFound += 1;
+					}
+					else
+					{
+						identityBytesFound = 0;
+						messageStart = bufferByteIndex + 1;
+					}
 
-					currentHue = hue;
-					FastLED.setBrightness(brightness);
+					bufferByteIndex += 1;
+				}
 
-					sendAcknowledge = true;
+				if (readBytes - messageStart < MessageHeaderLength)
+				{
+					Serial.println("Not enough bytes for message header");
+				}
+				// We found message start
+				else if (identityBytesFound == ProtocolIdentityLength)
+				{
+					uint8_t messageLength = readBuffer[messageStart + MsgPos_Length];
+					uint8_t messageType = readBuffer[messageStart + MsgPos_Type];
 
+					uint16_t messageNumber = uint8ArrayToUint16(&readBuffer[messageStart + MsgPos_Number]);
+
+					// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
+
+					if (messageType == MessageType_Acknowledge)
+					{
+						uint16_t responseTo = uint8ArrayToUint16(&readBuffer[messageStart + MsgPos_ResponseTo]);
+
+						Serial.printf("Received acknowledge to message number %d\n", (int)responseTo);
+					}
+
+					if (messageType == MessageType_Set)
+					{
+						uint8_t animation = readBuffer[messageStart + MsgPos_Animation];
+						uint8_t speed = readBuffer[messageStart + MsgPos_AnimationSpeed];
+						uint8_t hue = readBuffer[messageStart + MsgPos_Hue];
+						uint8_t brightness = readBuffer[messageStart + MsgPos_Brightness];
+						
+						Serial.printf("Received animation %d, speed %d, hue %d, brightness %d\n",
+							(int)animation, (int)speed, (int)hue, (int)brightness);
+
+						currentHue = hue;
+						FastLED.setBrightness(brightness);
+
+						sendAcknowledge = true;
+						sendAcknowledgeNumber = messageNumber;
+					}
+
+					bufferByteIndex = messageStart + messageLength;
 				}
 			}
-			
 		}
+
 		if (client.connected())
 		{
-			if (sendAcknowledge && client.availableForWrite() >= 2)
+			if (sendConnected && client.availableForWrite() >= MessageLength_Connected)
 			{
-				sendBuffer[MessageByte_Type] = MessageType_Acknowledge;
-				sendBuffer[1] = 0;
-				sendBuffer[2] = 0;
-				sendBuffer[3] = 0;
+				writeProtocolIdentity(&sendBuffer[0]);
+				
+				sendBuffer[MsgPos_Length] = MessageLength_Connected;
+				uint16ToUint8Array(currentMessageNumber, &sendBuffer[MsgPos_Number]);
+				sendBuffer[MsgPos_Type] = MessageType_Connected;
 
-				client.write(sendBuffer, 4);
+				// TODO: Get device name from EEPROM or filesystem
+				uint16ToUint8Array(8995, &sendBuffer[MsgPos_DeviceName]);
+
+				client.write(sendBuffer, MessageLength_Connected);
+				
+				currentMessageNumber += 1;
+				sendConnected = false;
+				
+				Serial.println("Sent MessageType_Connected");
+			}
+
+			if (sendAcknowledge && client.availableForWrite() >= MessageLength_Acknowledge)
+			{
+				writeProtocolIdentity(&sendBuffer[0]);
+
+				sendBuffer[MsgPos_Length] = MessageLength_Acknowledge;
+				uint16ToUint8Array(currentMessageNumber, &sendBuffer[MsgPos_Number]);
+				sendBuffer[MsgPos_Type] = MessageType_Acknowledge;
+				uint16ToUint8Array(sendAcknowledgeNumber, &sendBuffer[MsgPos_ResponseTo]);
+
+				client.write(sendBuffer, MessageLength_Acknowledge);
+
+				currentMessageNumber += 1;
 				sendAcknowledge = false;
 
-				client.println("Sent MessageType_Acknowledge");
+				Serial.println("Sent MessageType_Acknowledge");
 			}
 		}
 
