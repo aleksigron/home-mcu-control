@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
 		send_data[MsgPos_Length] = MessageLength_Set;
 		uint16ToUint8Array(currentMessageNumber, &send_data[MsgPos_Number]);
 		send_data[MsgPos_Type] = MessageType_Set;
-		send_data[MsgPos_Animation] = (uint8_t)(rand() % 2);
+		send_data[MsgPos_Animation] = (uint8_t)(rand() % 3);
 		send_data[MsgPos_AnimationSpeed] = 5;
 		send_data[MsgPos_Hue] = (uint8_t)(rand() % 256);
 		send_data[MsgPos_Brightness] = (uint8_t)(rand() % 256);

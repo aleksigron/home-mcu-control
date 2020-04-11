@@ -179,6 +179,15 @@ void loop()
 		else if (setAnimation == AnimationType_BrightnessWave)
 		{
 			currentAnimStep += setAnimSpeed;
+
+			FastLED.setBrightness(setBrightness);
+			
+			for (uint8_t i = 0; i < NUM_LEDS; ++i)
+			{
+				double ledAnimStep = (double)currentAnimStep + (256.0 / NUM_LEDS * i);
+				double factor = cos(ledAnimStep / 256.0 * M_TAU) * 0.5 + 0.5;
+				leds[i].setHSV(setHue, 255, (uint8_t)(factor * 255));
+			}
 		}
 
 		FastLED.show();
