@@ -11,6 +11,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include "civetweb/civetweb.h"
+
 #define BUFFER_SIZE 256
 
 const uint16_t port = 3123;
@@ -86,6 +88,23 @@ void error(const char *msg)
     exit(1);
 }
 
+static int handler(struct mg_connection* conn, void* ignored)
+{
+	const char* msg = "Hello world";
+	unsigned long len = (unsigned long)strlen(msg);
+
+	mg_printf(conn,
+	          "HTTP/1.1 200 OK\r\n"
+	          "Content-Length: %lu\r\n"
+	          "Content-Type: text/plain\r\n"
+	          "Connection: close\r\n\r\n",
+	          len);
+
+	mg_write(conn, msg, len);
+
+	return 200;
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd, newsockfd, portno;
@@ -96,20 +115,26 @@ int main(int argc, char *argv[])
 	unsigned char send_data[32];
 	unsigned short currentMessageNumber = 0;
 
-	if (argc < 2) {
-		fprintf(stderr,"ERROR, no port provided\n");
-		exit(1);
-	}
+	/* Server context handle */
+    struct mg_context *ctx;
+
+    /* Initialize the library */
+    mg_init_library(0);
+
+    /* Start the server */
+    ctx = mg_start(NULL, NULL, NULL);
+
+    /* Add some handler */
+    mg_set_request_handler(ctx, "/hello", handler, "Hello world");
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
 		error("ERROR opening socket");
 
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-	portno = atoi(argv[1]);
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
+	serv_addr.sin_port = htons(port);
 
 	if (bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
 		error("ERROR on binding");
@@ -215,6 +240,12 @@ int main(int argc, char *argv[])
 
 	close(newsockfd);
 	close(sockfd);
+
+    /* Stop the server */
+    mg_stop(ctx);
+
+    /* Un-initialize the library */
+    mg_exit_library();
 
 	return 0;
 }
