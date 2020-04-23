@@ -23,6 +23,9 @@ set (SERVER_SOURCES
 	src/main.c
 	src/WebServer.c
 	src/WebServer.h
+	src/DeviceProtocol.h
+	src/DeviceServer.c
+	src/DeviceServer.h
 )
 
 add_executable(${EXECUTABLE_NAME} ${DEPS_SOURCES} ${SERVER_SOURCES})
