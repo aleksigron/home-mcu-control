@@ -21,6 +21,8 @@ set (DEPS_SOURCES
 
 set (SERVER_SOURCES
 	src/main.c
+	src/WebServer.c
+	src/WebServer.h
 )
 
 add_executable(${EXECUTABLE_NAME} ${DEPS_SOURCES} ${SERVER_SOURCES})
