@@ -1,5 +1,7 @@
 #include "DeviceProtocol.h"
 
+#include "DeviceProtocolConstants.h"
+
 static const uint8_t ProtocolIdentityLength = 4;
 static const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
 
@@ -13,12 +15,24 @@ size_t DeviceProtocol_getProtocolIdentityLength()
 	return ProtocolIdentityLength;
 }
 
-void DeviceProtocol_writeIdentity(uint8_t* array)
+void DeviceProtocol_writeIdentity(uint8_t* buffer)
 {
 	for (int i = 0; i < ProtocolIdentityLength; ++i)
 	{
-		array[i] = ProtocolIdentity[i];
+		buffer[i] = ProtocolIdentity[i];
 	}
+}
+void DeviceProtocol_writeMessageSet(uint8_t* buffer, uint16_t number, uint8_t animType,
+	uint8_t animSpeed, uint8_t hue, uint8_t brightness)
+{
+	DeviceProtocol_writeIdentity(&buffer[0]);
+	buffer[MsgPos_Length] = MsgLen_Set;
+	DeviceProtocol_uint16ToUint8Array(number, &buffer[MsgPos_Number]);
+	buffer[MsgPos_Type] = MsgType_Set;
+	buffer[MsgPos_Animation] = animType;
+	buffer[MsgPos_AnimationSpeed] = animSpeed;
+	buffer[MsgPos_Hue] = hue;
+	buffer[MsgPos_Brightness] = brightness;
 }
 
 void DeviceProtocol_uint16ToUint8Array(uint16_t val, uint8_t* arr)

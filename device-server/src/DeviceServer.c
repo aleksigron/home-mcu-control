@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 
 #include "DeviceProtocol.h"
+#include "DeviceProtocolConstants.h"
 
 enum { BufferSize = 128 };
 const uint16_t port = 3123;
@@ -89,14 +90,14 @@ int DeviceServer_run()
 				// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
 
 
-				if (messageType == MessageType_Acknowledge)
+				if (messageType == MsgType_Acknowledge)
 				{
 					uint16_t responseTo = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_ResponseTo]);
 
 					printf("Received acknowledge to message number %d\n", (int)responseTo);
 				}
 
-				if (messageType == MessageType_Connected)
+				if (messageType == MsgType_Connected)
 				{
 					uint16_t deviceName = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_DeviceName]);
 
@@ -115,23 +116,23 @@ int DeviceServer_run()
 
 		sleep(5);
 
-		DeviceProtocol_writeIdentity(&buffer[0]);
-		buffer[MsgPos_Length] = MessageLength_Set;
-		DeviceProtocol_uint16ToUint8Array(currentMessageNumber, &buffer[MsgPos_Number]);
-		buffer[MsgPos_Type] = MessageType_Set;
-		buffer[MsgPos_Animation] = (uint8_t)(rand() % 3);
-		buffer[MsgPos_AnimationSpeed] = 5;
-		buffer[MsgPos_Hue] = (uint8_t)(rand() % 256);
-		buffer[MsgPos_Brightness] = (uint8_t)(rand() % 256);
+		{
+			uint8_t animType = (uint8_t)(rand() % 3);
+			uint8_t animSpeed = 5;
+			uint8_t hue = (uint8_t)(rand() % 256);
+			uint8_t brightness = (uint8_t)(rand() % 32);
 
-		currentMessageNumber += 1;
+			DeviceProtocol_writeMessageSet(buffer, currentMessageNumber, animType, animSpeed, hue, brightness);
+
+			currentMessageNumber += 1;
+		}
 
 		printf("Sending MessageType_Set, animation %d, hue %d, brightness %d\n",
 			(int)buffer[MsgPos_Animation],
 			(int)buffer[MsgPos_Hue],
 			(int)buffer[MsgPos_Brightness]);
 
-		writeBytes = write(newsockfd, &buffer, MessageLength_Set);
+		writeBytes = write(newsockfd, &buffer, MsgLen_Set);
 		if (writeBytes < 0)
 		{
 			error("ERROR writing to socket");
