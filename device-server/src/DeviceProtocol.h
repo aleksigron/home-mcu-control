@@ -1,9 +1,9 @@
 #pragma once
 
-const uint8_t ProtocolIdentityLength = 4;
-const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
+#include <stddef.h>
+#include <stdint.h>
 
-enum
+enum MsgPos
 {
 	MsgPos_Protocol = 0,
 	MsgPos_Length = 4,
@@ -23,7 +23,7 @@ enum
 	MsgPos_ResponseTo = 8
 };
 
-enum
+enum MsgType
 {
 	MessageType_None = 0,
 	MessageType_Acknowledge = 1,
@@ -31,37 +31,24 @@ enum
 	MessageType_Set = 3
 };
 
-enum
+enum MsgLen
 {
 	MessageLength_Connected = 9,
 	MessageLength_Acknowledge = 10,
 	MessageLength_Set = 12
 };
 
-enum
+enum AnimType
 {
 	AnimationType_None = 0,
 	AnimationType_BrightnessPulse = 1,
 	AnimationType_BrightnessWave = 2
 };
 
-void writeProtocolIdentity(uint8_t* array)
-{
-	for (int i = 0; i < ProtocolIdentityLength; ++i)
-	{
-		array[i] = ProtocolIdentity[i];
-	}
-}
+const uint8_t* DeviceProtocol_getProtocolIdentity();
+size_t DeviceProtocol_getProtocolIdentityLength();
 
-void uint16ToUint8Array(uint16_t val, uint8_t* arr)
-{
-	arr[0] = (uint8_t)(val & 0x00ff);
-	arr[1] = (uint8_t)((val & 0xff00) >> 8);
-}
+void DeviceProtocol_writeIdentity(uint8_t* array);
 
-uint16_t uint8ArrayToUint16(const uint8_t* arr)
-{
-	uint16_t result = arr[0];
-	result |= arr[1] << 8;
-	return result;
-}
+void DeviceProtocol_uint16ToUint8Array(uint16_t val, uint8_t* arr);
+uint16_t DeviceProtocol_uint8ArrayToUint16(const uint8_t* arr);

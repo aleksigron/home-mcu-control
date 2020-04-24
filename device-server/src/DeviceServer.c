@@ -27,6 +27,8 @@ int DeviceServer_run()
 	struct sockaddr_in serverAddr, clientAddr;
 	ssize_t readBytes, writeBytes;
 	unsigned short currentMessageNumber = 0;
+	size_t protocolIdentityLength = DeviceProtocol_getProtocolIdentityLength();
+	const uint8_t* protocolIdentity = DeviceProtocol_getProtocolIdentity();
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
@@ -61,9 +63,9 @@ int DeviceServer_run()
 			int messageStart = 0;
 
 			// Find start of proper message
-			while (identityBytesFound < ProtocolIdentityLength && bufferByteIndex < readBytes)
+			while (identityBytesFound < protocolIdentityLength && bufferByteIndex < readBytes)
 			{
-				if (buffer[bufferByteIndex] == ProtocolIdentity[identityBytesFound])
+				if (buffer[bufferByteIndex] == protocolIdentity[identityBytesFound])
 				{
 					identityBytesFound += 1;
 				}
@@ -77,7 +79,7 @@ int DeviceServer_run()
 			}
 
 			// We found message start
-			if (identityBytesFound == ProtocolIdentityLength)
+			if (identityBytesFound == protocolIdentityLength)
 			{
 				printf("We found message start\n");
 
@@ -89,14 +91,14 @@ int DeviceServer_run()
 
 				if (messageType == MessageType_Acknowledge)
 				{
-					uint16_t responseTo = uint8ArrayToUint16(&buffer[messageStart + MsgPos_ResponseTo]);
+					uint16_t responseTo = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_ResponseTo]);
 
 					printf("Received acknowledge to message number %d\n", (int)responseTo);
 				}
 
 				if (messageType == MessageType_Connected)
 				{
-					uint16_t deviceName = uint8ArrayToUint16(&buffer[messageStart + MsgPos_DeviceName]);
+					uint16_t deviceName = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_DeviceName]);
 
 					printf("Received connected message from device %d\n", (int)deviceName);
 				}
@@ -113,9 +115,9 @@ int DeviceServer_run()
 
 		sleep(5);
 
-		writeProtocolIdentity(&buffer[0]);
+		DeviceProtocol_writeIdentity(&buffer[0]);
 		buffer[MsgPos_Length] = MessageLength_Set;
-		uint16ToUint8Array(currentMessageNumber, &buffer[MsgPos_Number]);
+		DeviceProtocol_uint16ToUint8Array(currentMessageNumber, &buffer[MsgPos_Number]);
 		buffer[MsgPos_Type] = MessageType_Set;
 		buffer[MsgPos_Animation] = (uint8_t)(rand() % 3);
 		buffer[MsgPos_AnimationSpeed] = 5;

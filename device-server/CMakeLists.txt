@@ -23,6 +23,7 @@ set (SERVER_SOURCES
 	src/main.c
 	src/WebServer.c
 	src/WebServer.h
+	src/DeviceProtocol.c
 	src/DeviceProtocol.h
 	src/DeviceServer.c
 	src/DeviceServer.h
