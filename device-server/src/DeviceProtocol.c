@@ -69,7 +69,7 @@ void DeviceProtocol_readMessageConnected(const uint8_t* message, struct MessageC
 	messageOut->deviceName = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_DeviceName]);
 }
 
-void DeviceProtocol_readMessageSet(const uint8_t* message, struct MessageSet* messageOut)
+void DeviceProtocol_readMessageSet(const uint8_t* message, struct MessageSetLighting* messageOut)
 {
 	messageOut->number = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_Number]);
 
@@ -86,17 +86,26 @@ void DeviceProtocol_writeIdentity(uint8_t* buffer)
 		buffer[i] = ProtocolIdentity[i];
 	}
 }
-void DeviceProtocol_writeMessageSet(uint8_t* buffer, uint16_t number, uint8_t animType,
-	uint8_t animSpeed, uint8_t hue, uint8_t brightness)
+
+void DeviceProtocol_writeMessageSetName(uint8_t* buffer, struct MessageSetName* message)
 {
 	DeviceProtocol_writeIdentity(&buffer[0]);
-	buffer[MsgPos_Length] = MsgLen_Set;
-	DeviceProtocol_uint16ToUint8Array(number, &buffer[MsgPos_Number]);
-	buffer[MsgPos_Type] = MsgType_Set;
-	buffer[MsgPos_Animation] = animType;
-	buffer[MsgPos_AnimationSpeed] = animSpeed;
-	buffer[MsgPos_Hue] = hue;
-	buffer[MsgPos_Brightness] = brightness;
+	buffer[MsgPos_Length] = MsgLen_SetName;
+	DeviceProtocol_uint16ToUint8Array(message->number, &buffer[MsgPos_Number]);
+	buffer[MsgPos_Type] = MsgType_SetName;
+	
+}
+
+void DeviceProtocol_writeMessageSetLighting(uint8_t* buffer, struct MessageSetLighting* message)
+{
+	DeviceProtocol_writeIdentity(&buffer[0]);
+	buffer[MsgPos_Length] = MsgLen_SetLighting;
+	DeviceProtocol_uint16ToUint8Array(message->number, &buffer[MsgPos_Number]);
+	buffer[MsgPos_Type] = MsgType_SetLighting;
+	buffer[MsgPos_Animation] = message->animationType;
+	buffer[MsgPos_AnimationSpeed] = message->animationSpeed;
+	buffer[MsgPos_Hue] = message->hue;
+	buffer[MsgPos_Brightness] = message->brightness;
 }
 
 void DeviceProtocol_uint16ToUint8Array(uint16_t val, uint8_t* arr)

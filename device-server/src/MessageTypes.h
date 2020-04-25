@@ -16,7 +16,14 @@ struct MessageConnected
 	uint16_t deviceName;
 };
 
-struct MessageSet
+struct MessageSetName
+{
+	uint16_t number;
+
+	uint16_t deviceName;
+};
+
+struct MessageSetLighting
 {
 	uint16_t number;
 

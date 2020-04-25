@@ -104,12 +104,14 @@ int DeviceServer_run()
 		sleep(5);
 
 		{
-			uint8_t animType = (uint8_t)(rand() % 3);
-			uint8_t animSpeed = 5;
-			uint8_t hue = (uint8_t)(rand() % 256);
-			uint8_t brightness = (uint8_t)(rand() % 32);
+			struct MessageSetLighting message;
+			message.number = currentMessageNumber;
+			message.animationType = (uint8_t)(rand() % 3);
+			message.animationSpeed = 5;
+			message.hue = (uint8_t)(rand() % 256);
+			message.brightness = (uint8_t)(rand() % 32);
 
-			DeviceProtocol_writeMessageSet(buffer, currentMessageNumber, animType, animSpeed, hue, brightness);
+			DeviceProtocol_writeMessageSetLighting(buffer, &message);
 
 			currentMessageNumber += 1;
 		}
@@ -119,7 +121,7 @@ int DeviceServer_run()
 			(int)buffer[MsgPos_Hue],
 			(int)buffer[MsgPos_Brightness]);
 
-		writeBytes = write(newsockfd, &buffer, MsgLen_Set);
+		writeBytes = write(newsockfd, &buffer, MsgLen_SetLighting);
 		if (writeBytes < 0)
 		{
 			error("ERROR writing to socket");
