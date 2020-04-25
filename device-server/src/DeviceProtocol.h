@@ -6,6 +6,8 @@
 const uint8_t* DeviceProtocol_getProtocolIdentity();
 size_t DeviceProtocol_getProtocolIdentityLength();
 
+const uint8_t* DeviceProtocol_findMessageStart(const uint8_t* buffer, const uint8_t* end);
+
 void DeviceProtocol_writeIdentity(uint8_t* buffer);
 
 void DeviceProtocol_writeMessageSet(uint8_t* buffer, uint16_t number, uint8_t animType,

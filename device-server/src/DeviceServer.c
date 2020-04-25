@@ -56,55 +56,43 @@ int DeviceServer_run()
 
 		printf("Read bytes: %d\n", (int)readBytes);
 
-		int bufferByteIndex = 0;
+		const uint8_t* bufferItr = buffer;
+		const uint8_t* bufferEnd = buffer + readBytes;
 
-		while (bufferByteIndex < readBytes)
+		while (bufferItr < bufferEnd)
 		{
-			int identityBytesFound = 0;
-			int messageStart = 0;
-
-			// Find start of proper message
-			while (identityBytesFound < protocolIdentityLength && bufferByteIndex < readBytes)
-			{
-				if (buffer[bufferByteIndex] == protocolIdentity[identityBytesFound])
-				{
-					identityBytesFound += 1;
-				}
-				else
-				{
-					identityBytesFound = 0;
-					messageStart = bufferByteIndex + 1;
-				}
-
-				bufferByteIndex += 1;
-			}
+			const uint8_t* messageStart = DeviceProtocol_findMessageStart(bufferItr, bufferEnd);
 
 			// We found message start
-			if (identityBytesFound == protocolIdentityLength)
+			if (messageStart != NULL)
 			{
 				printf("We found message start\n");
 
-				uint8_t messageLength = buffer[messageStart + MsgPos_Length];
-				uint8_t messageType = buffer[messageStart + MsgPos_Type];
+				uint8_t messageLength = messageStart[MsgPos_Length];
+				uint8_t messageType = messageStart[MsgPos_Type];
 
 				// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
 
 
 				if (messageType == MsgType_Acknowledge)
 				{
-					uint16_t responseTo = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_ResponseTo]);
+					uint16_t responseTo = DeviceProtocol_uint8ArrayToUint16(&messageStart[MsgPos_ResponseTo]);
 
 					printf("Received acknowledge to message number %d\n", (int)responseTo);
 				}
 
 				if (messageType == MsgType_Connected)
 				{
-					uint16_t deviceName = DeviceProtocol_uint8ArrayToUint16(&buffer[messageStart + MsgPos_DeviceName]);
+					uint16_t deviceName = DeviceProtocol_uint8ArrayToUint16(&messageStart[MsgPos_DeviceName]);
 
 					printf("Received connected message from device %d\n", (int)deviceName);
 				}
 
-				bufferByteIndex = messageStart + messageLength;
+				bufferItr = messageStart + messageLength;
+			}
+			else
+			{
+				bufferItr = bufferEnd;
 			}
 		}
 

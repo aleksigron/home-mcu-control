@@ -15,6 +15,37 @@ size_t DeviceProtocol_getProtocolIdentityLength()
 	return ProtocolIdentityLength;
 }
 
+const uint8_t* DeviceProtocol_findMessageStart(const uint8_t* buffer, const uint8_t* end)
+{
+	size_t identityBytesFound = 0;
+	const uint8_t* messageStart = buffer;
+
+	// Find start of proper message
+	while (identityBytesFound < ProtocolIdentityLength && buffer != end)
+	{
+		if (*buffer == ProtocolIdentity[identityBytesFound])
+		{
+			identityBytesFound += 1;
+		}
+		else
+		{
+			identityBytesFound = 0;
+			messageStart = buffer + 1;
+		}
+
+		buffer += 1;
+	}
+
+	if (identityBytesFound == ProtocolIdentityLength)
+	{
+		return messageStart;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
 void DeviceProtocol_writeIdentity(uint8_t* buffer)
 {
 	for (int i = 0; i < ProtocolIdentityLength; ++i)
