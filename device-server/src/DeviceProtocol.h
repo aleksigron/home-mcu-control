@@ -3,10 +3,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-const uint8_t* DeviceProtocol_getProtocolIdentity();
-size_t DeviceProtocol_getProtocolIdentityLength();
+struct MessageAcknowledge;
+struct MessageConnected;
+struct MessageSet;
 
 const uint8_t* DeviceProtocol_findMessageStart(const uint8_t* buffer, const uint8_t* end);
+uint8_t DeviceProtocol_getMessageType(const uint8_t* messageStart);
+uint8_t DeviceProtocol_getMessageLength(const uint8_t* messageStart);
+
+void DeviceProtocol_readMessageAcknowledge(const uint8_t* message, struct MessageAcknowledge* messageOut);
+void DeviceProtocol_readMessageConnected(const uint8_t* message, struct MessageConnected* messageOut);
+void DeviceProtocol_readMessageSet(const uint8_t* message, struct MessageSet* messageOut);
 
 void DeviceProtocol_writeIdentity(uint8_t* buffer);
 

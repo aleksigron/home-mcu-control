@@ -1,6 +1,7 @@
 #include "DeviceProtocol.h"
 
 #include "DeviceProtocolConstants.h"
+#include "MessageTypes.h"
 
 static const uint8_t ProtocolIdentityLength = 4;
 static const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
@@ -44,6 +45,38 @@ const uint8_t* DeviceProtocol_findMessageStart(const uint8_t* buffer, const uint
 	{
 		return NULL;
 	}
+}
+
+uint8_t DeviceProtocol_getMessageType(const uint8_t* messageStart)
+{
+	return messageStart[MsgPos_Type];
+}
+
+uint8_t DeviceProtocol_getMessageLength(const uint8_t* messageStart)
+{
+	return messageStart[MsgPos_Length];
+}
+
+void DeviceProtocol_readMessageAcknowledge(const uint8_t* message, struct MessageAcknowledge* messageOut)
+{
+	messageOut->number = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_Number]);
+	messageOut->responseTo = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_ResponseTo]);
+}
+
+void DeviceProtocol_readMessageConnected(const uint8_t* message, struct MessageConnected* messageOut)
+{
+	messageOut->number = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_Number]);
+	messageOut->deviceName = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_DeviceName]);
+}
+
+void DeviceProtocol_readMessageSet(const uint8_t* message, struct MessageSet* messageOut)
+{
+	messageOut->number = DeviceProtocol_uint8ArrayToUint16(&message[MsgPos_Number]);
+
+	messageOut->animationType = message[MsgPos_Animation];
+	messageOut->animationSpeed = message[MsgPos_AnimationSpeed];
+	messageOut->hue = message[MsgPos_Hue];
+	messageOut->brightness = message[MsgPos_Brightness];
 }
 
 void DeviceProtocol_writeIdentity(uint8_t* buffer)

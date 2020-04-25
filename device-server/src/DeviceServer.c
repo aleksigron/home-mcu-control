@@ -10,6 +10,7 @@
 
 #include "DeviceProtocol.h"
 #include "DeviceProtocolConstants.h"
+#include "MessageTypes.h"
 
 enum { BufferSize = 128 };
 const uint16_t port = 3123;
@@ -28,8 +29,6 @@ int DeviceServer_run()
 	struct sockaddr_in serverAddr, clientAddr;
 	ssize_t readBytes, writeBytes;
 	unsigned short currentMessageNumber = 0;
-	size_t protocolIdentityLength = DeviceProtocol_getProtocolIdentityLength();
-	const uint8_t* protocolIdentity = DeviceProtocol_getProtocolIdentity();
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
@@ -66,26 +65,26 @@ int DeviceServer_run()
 			// We found message start
 			if (messageStart != NULL)
 			{
-				printf("We found message start\n");
-
-				uint8_t messageLength = messageStart[MsgPos_Length];
-				uint8_t messageType = messageStart[MsgPos_Type];
+				uint8_t messageLength = DeviceProtocol_getMessageLength(messageStart);
+				uint8_t messageType = DeviceProtocol_getMessageType(messageStart);
 
 				// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
 
 
 				if (messageType == MsgType_Acknowledge)
 				{
-					uint16_t responseTo = DeviceProtocol_uint8ArrayToUint16(&messageStart[MsgPos_ResponseTo]);
+					struct MessageAcknowledge acknowledge;
+					DeviceProtocol_readMessageAcknowledge(messageStart, &acknowledge);
 
-					printf("Received acknowledge to message number %d\n", (int)responseTo);
+					printf("Received acknowledge to message %d\n", (int)acknowledge.responseTo);
 				}
 
 				if (messageType == MsgType_Connected)
 				{
-					uint16_t deviceName = DeviceProtocol_uint8ArrayToUint16(&messageStart[MsgPos_DeviceName]);
+					struct MessageConnected connected;
+					DeviceProtocol_readMessageConnected(messageStart, &connected);
 
-					printf("Received connected message from device %d\n", (int)deviceName);
+					printf("Received connected message from device %d\n", (int)connected.deviceName);
 				}
 
 				bufferItr = messageStart + messageLength;
