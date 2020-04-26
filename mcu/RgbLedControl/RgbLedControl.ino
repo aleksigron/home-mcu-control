@@ -2,6 +2,7 @@
 #include "ESP8266WiFi.h"
 
 #include "WifiCredentials.h"
+#include "DeviceProtocolConstants.h"
 
 #define M_TAU 6.28318530718
 
@@ -20,48 +21,6 @@ const uint8_t ProtocolIdentity[ProtocolIdentityLength] = { 101, 232, 25, 164 };
 CRGB leds[NUM_LEDS];
 uint8_t sendBuffer[SEND_BUFFER_SIZE];
 uint8_t readBuffer[READ_BUFFER_SIZE];
-
-enum MsgPos
-{
-	MsgPos_Protocol = 0,
-	MsgPos_Length = 4,
-	MsgPos_Number = 5,
-	MsgPos_Type = 7,
-
-	// For MessageType_Set
-	MsgPos_Animation = 8,
-	MsgPos_AnimationSpeed = 9,
-	MsgPos_Hue = 10,
-	MsgPos_Brightness = 11,
-
-	// For MessageType_Connected
-	MsgPos_DeviceName = 8,
-
-	// For MessageType_Acknowledge
-	MsgPos_ResponseTo = 8
-};
-
-enum MessageType : uint8_t
-{
-	MessageType_None = 0,
-	MessageType_Acknowledge = 1,
-	MessageType_Connected = 2,
-	MessageType_Set = 3
-};
-
-enum MessageLength : uint8_t
-{
-	MessageLength_Connected = 10,
-	MessageLength_Acknowledge = 10,
-	MessageLength_Set = 12
-};
-
-enum AnimationType : uint8_t
-{
-	AnimationType_None = 0,
-	AnimationType_BrightnessPulse = 1,
-	AnimationType_BrightnessWave = 2
-};
 
 void writeProtocolIdentity(uint8_t* array)
 {
@@ -155,7 +114,7 @@ void loop()
 	while (client.available() || client.connected())
 	{
 		// Update LEDs
-		if (setAnimation == AnimationType_None)
+		if (setAnimation == AnimType_None)
 		{
 			FastLED.setBrightness(setBrightness);
 
@@ -164,7 +123,7 @@ void loop()
 				leds[i].setHue(setHue);
 			}
 		}
-		else if (setAnimation == AnimationType_BrightnessPulse)
+		else if (setAnimation == AnimType_BrightnessPulse)
 		{
 			currentAnimStep += setAnimSpeed;
 
@@ -176,7 +135,7 @@ void loop()
 				leds[i].setHue(setHue);
 			}
 		}
-		else if (setAnimation == AnimationType_BrightnessWave)
+		else if (setAnimation == AnimType_BrightnessWave)
 		{
 			currentAnimStep += setAnimSpeed;
 
@@ -242,14 +201,14 @@ void loop()
 
 					// TODO: if (messageStart + messageLength > READ_BUFFER_SIZE)
 
-					if (messageType == MessageType_Acknowledge)
+					if (messageType == MsgType_Acknowledge)
 					{
 						uint16_t responseTo = uint8ArrayToUint16(&readBuffer[messageStart + MsgPos_ResponseTo]);
 
 						Serial.printf("Received acknowledge to message number %d\n", (int)responseTo);
 					}
 
-					if (messageType == MessageType_Set)
+					if (messageType == MsgType_SetLighting)
 					{
 						setAnimation = readBuffer[messageStart + MsgPos_Animation];
 						setAnimSpeed = readBuffer[messageStart + MsgPos_AnimationSpeed];
@@ -258,8 +217,6 @@ void loop()
 						
 						Serial.printf("Received animation %d, speed %d, hue %d, brightness %d\n",
 							(int)setAnimation, (int)setAnimSpeed, (int)setHue, (int)setBrightness);
-
-						currentAnimStep = 0;
 
 						sendAcknowledge = true;
 						sendAcknowledgeNumber = messageNumber;
@@ -272,18 +229,18 @@ void loop()
 
 		if (client.connected())
 		{
-			if (sendConnected && client.availableForWrite() >= MessageLength_Connected)
+			if (sendConnected && client.availableForWrite() >= MsgLen_Connected)
 			{
 				writeProtocolIdentity(&sendBuffer[0]);
 				
-				sendBuffer[MsgPos_Length] = MessageLength_Connected;
+				sendBuffer[MsgPos_Length] = MsgLen_Connected;
 				uint16ToUint8Array(currentMessageNumber, &sendBuffer[MsgPos_Number]);
-				sendBuffer[MsgPos_Type] = MessageType_Connected;
+				sendBuffer[MsgPos_Type] = MsgType_Connected;
 
 				// TODO: Get device name from EEPROM or filesystem
 				uint16ToUint8Array(8995, &sendBuffer[MsgPos_DeviceName]);
 
-				client.write(sendBuffer, MessageLength_Connected);
+				client.write(sendBuffer, MsgLen_Connected);
 				
 				currentMessageNumber += 1;
 				sendConnected = false;
@@ -291,16 +248,16 @@ void loop()
 				Serial.println("Sent MessageType_Connected");
 			}
 
-			if (sendAcknowledge && client.availableForWrite() >= MessageLength_Acknowledge)
+			if (sendAcknowledge && client.availableForWrite() >= MsgLen_Acknowledge)
 			{
 				writeProtocolIdentity(&sendBuffer[0]);
 
-				sendBuffer[MsgPos_Length] = MessageLength_Acknowledge;
+				sendBuffer[MsgPos_Length] = MsgLen_Acknowledge;
 				uint16ToUint8Array(currentMessageNumber, &sendBuffer[MsgPos_Number]);
-				sendBuffer[MsgPos_Type] = MessageType_Acknowledge;
+				sendBuffer[MsgPos_Type] = MsgType_Acknowledge;
 				uint16ToUint8Array(sendAcknowledgeNumber, &sendBuffer[MsgPos_ResponseTo]);
 
-				client.write(sendBuffer, MessageLength_Acknowledge);
+				client.write(sendBuffer, MsgLen_Acknowledge);
 
 				currentMessageNumber += 1;
 				sendAcknowledge = false;
