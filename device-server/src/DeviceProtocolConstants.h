@@ -31,7 +31,7 @@ enum MsgType
 
 enum MsgLen
 {
-	MsgLen_Connected = 9,
+	MsgLen_Connected = 10,
 	MsgLen_Acknowledge = 10,
 	MsgLen_SetName = 10,
 	MsgLen_SetLighting = 12
