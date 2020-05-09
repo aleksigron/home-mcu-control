@@ -4,8 +4,21 @@
 
 #include "civetweb/civetweb.h"
 
-static int handler(struct mg_connection* conn, void* ignored)
+#include "DeviceServer.h"
+#include "DeviceRequest.h"
+
+static int handler(struct mg_connection* conn, void* serverPtr)
 {
+	struct WebServer* server = (struct WebServer*)serverPtr;
+
+	// Add a request to be processed by device server
+
+	struct DeviceRequest request;
+	request.type = DeviceRequestType_SetLighting;
+	DeviceServer_requestReceive(server->deviceServer, &request);
+
+	// Respond to HTTP request
+
 	const char* msg = "Hello world";
 	unsigned long len = (unsigned long)strlen(msg);
 
@@ -21,8 +34,10 @@ static int handler(struct mg_connection* conn, void* ignored)
 	return 200;
 }
 
-int WebServer_init(struct WebServer* server)
+int WebServer_init(struct WebServer* server, struct DeviceServer* deviceServer)
 {
+	server->deviceServer = deviceServer;
+
     /* Initialize the library */
     mg_init_library(0);
 
@@ -30,13 +45,15 @@ int WebServer_init(struct WebServer* server)
     server->context = mg_start(NULL, NULL, NULL);
 
     /* Add some handler */
-    mg_set_request_handler(server->context, "/hello", handler, "Hello world");
+    mg_set_request_handler(server->context, "/hello", handler, server);
 
 	return 0;
 }
 
 int WebServer_deinit(struct WebServer* server)
 {
+	server->deviceServer = NULL;
+
     /* Stop the server */
     mg_stop(server->context);
 

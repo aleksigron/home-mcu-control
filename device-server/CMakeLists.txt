@@ -24,6 +24,7 @@ set (SERVER_SOURCES
 	src/DeviceProtocolConstants.h
 	src/DeviceProtocol.c
 	src/DeviceProtocol.h
+	src/DeviceRequest.h
 	src/DeviceServer.c
 	src/DeviceServer.h
 	src/MessageTypes.h
